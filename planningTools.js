@@ -89,16 +89,17 @@ function submitPlanningTools(data){
    if(edit.kind==='backup')Object.assign(candidate.settings.backup,{enabled:data.has('enabled'),intervalDays:Number(data.get('intervalDays')),snoozedUntil:''});
    validate(candidate);
   }
-  localStorage.setItem(KEY,JSON.stringify(candidate));state=candidate;$('#editor').close();$('#form button[type=submit]').textContent='保存する';render();
+  persistCompassState(candidate);state=candidate;$('#editor').close();$('#form button[type=submit]').textContent='保存する';render();
  }catch(e){alert('保存できませんでした：'+e.message);}
 }
 function handlePlanningClick(action){
+ if(action==='restart-study-today'){restartStudyToday();return true;}
  if(action==='weekly-options'){openPlanningEditor('weekly');return true;}
  if(action==='backup-options'){openPlanningEditor('backup');return true;}
  if(action==='replan-open'||action==='replan-back'){if($('#editor').open)$('#editor').close();openPlanningEditor('replan');return true;}
  if(action==='backup-snooze'){
   if(loadFailed)return true;
-  try{const raw=localStorage.getItem(KEY),candidate=raw?validate(JSON.parse(raw)):validate(clonePlanning(state));candidate.settings.backup.snoozedUntil=addDays(today(),1);localStorage.setItem(KEY,JSON.stringify(candidate));state=candidate;render();}catch{alert('通知の延期を保存できませんでした。');}return true;
+  try{const raw=localStorage.getItem(KEY),candidate=raw?validate(JSON.parse(raw)):validate(clonePlanning(state));candidate.settings.backup.snoozedUntil=addDays(today(),1);persistCompassState(candidate);state=candidate;render();}catch{alert('通知の延期を保存できませんでした。');}return true;
  }
  return false;
 }
@@ -112,10 +113,40 @@ function exportCompassBackup(){
   const payload=JSON.stringify(candidate,null,2),link=document.createElement('a');
   url=URL.createObjectURL(new Blob([payload],{type:'application/json'}));link.href=url;link.download=`compass-backup-${today()}-${Date.now()}.json`;document.body.append(link);
   try{link.click();}finally{link.remove();}
-  try{localStorage.setItem(KEY,JSON.stringify(candidate));state=candidate;render();}catch{alert('JSONの書き出しを開始しましたが、最終書き出し日の記録に失敗しました。ダウンロード一覧を確認してください。');}
+  try{persistCompassState(candidate);state=candidate;render();}catch{alert('JSONの書き出しを開始しましたが、最終書き出し日の記録に失敗しました。ダウンロード一覧を確認してください。');}
   return true;
  }catch(e){alert('書き出しできませんでした：'+e.message);return false;}
  finally{if(url)setTimeout(()=>URL.revokeObjectURL(url),1000);}
 }
 
 document.addEventListener('DOMContentLoaded',()=>{document.querySelector('#editor').addEventListener('close',()=>{if(!document.querySelector('#editor').open)document.querySelector('#form button[type=submit]').textContent='保存する';});});
+function buildStartToday(source,date=today()){
+ const candidate=validate(clonePlanning(source));
+ const past=candidate.tasks.filter(t=>t.date<date&&['USCPA','IELTS','大学院面接','放送大学'].includes(t.category)&&isReplaceableTask(t,t.date,true));
+ const ids=new Set(past.map(t=>t.id));
+ candidate.tasks=candidate.tasks.filter(t=>!ids.has(t.id));
+ const archive=candidate.planner.beforeStartArchive;
+ archive.startDate=date;
+ archive.tasks.push(...clonePlanning(past));
+ for(const [d,r] of Object.entries(candidate.planner.history))if(d<date&&r.taskIds.some(id=>ids.has(id))){
+  archive.history[d]=clonePlanning(r);
+  const remaining=r.taskIds.filter(id=>!ids.has(id));
+  if(!remaining.length)delete candidate.planner.history[d];
+  else {r.taskIds=remaining;r.farTopicIds=inferFarTopicIds(candidate,d);}
+ }
+ candidate.planner.startDate=date;
+ const result=buildReplan(candidate,date,scheduledMinutes(candidate,date),true);
+ return {...result,past};
+}
+function restartStudyToday(){
+ if(loadFailed){alert('バックアップの読み込みエラーを解決してください。');return;}
+ try{
+  const raw=localStorage.getItem(KEY),date=today();
+  const result=buildStartToday(raw?validate(JSON.parse(raw)):state,date);
+  const names=rows=>rows.map(t=>`${t.name}（${t.minutes}分）`).join('\n')||'なし';
+  if(!confirm(`学習開始日を ${date} に変更します。\n\n過去の未完了自動タスクを保管：${result.past.length}件\n${names(result.past)}\n\n今日の自動タスクを置き換え：${result.removed.length}件\n${names(result.removed)}\n\n今日の新しいタスク：${result.added.length}件\n${names(result.added)}\n\n完了実績・手動タスク・編集済み・繰越タスクは保持します。元のタスクは履歴に保管します。この内容で開始しますか？`))return;
+  if(today()!==date||localStorage.getItem(KEY)!==raw){alert('データまたは日付が変わりました。もう一度確認してください。');return;}
+  persistCompassState(result.candidate);
+  state=result.candidate;location.hash='home';render();
+ }catch(e){alert('開始日を変更できませんでした。現在のデータは変更していません。');}
+}
