@@ -1,7 +1,7 @@
 'use strict';
 // Cache only the app shell. User records remain solely in existing localStorage.
 const CACHE_PREFIX='compass-shell-'+encodeURIComponent(new URL(self.registration.scope).pathname)+'-';
-const CACHE_NAME=CACHE_PREFIX+'firebase-start-today-v1';
+const CACHE_NAME=CACHE_PREFIX+'october-reset-audit-v1';
 const ASSETS=['./','index.html','styles.css','responsive.css','app.js','firebaseConfig.js','syncCore.js','sync.js','firebaseAdapter.js','farData.js','farWorkload.js','programs.js','planner.js','planningTools.js','spacedReview.js','universities.js','universityData.js','universityLibrary.js','mobile.js','pwa.js','manifest.webmanifest','icons/character-icon.png'];
 const assetURLs=ASSETS.map(path=>new URL(path,self.registration.scope).href);
 self.addEventListener('install',event=>{

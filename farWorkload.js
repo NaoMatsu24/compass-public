@@ -16,7 +16,7 @@ function migrateFarWorkload(s){
 }
 function farStudyProgress(source,f,date=today()){
  let actual=f.priorStudyMinutes||0,reserved=0;
- for(const t of source.tasks){
+ for(const t of expandStudyTasks(source.tasks)){
   if(t.category!=='USCPA'||t.farStudyChapterId!==f.id||t.farStudyCredit!==true)continue;
   if(t.done){if((t.completedDate||t.date)<=date)actual+=t.actual;else reserved+=Math.max(t.minutes,t.actual);}
   else reserved+=t.minutes;

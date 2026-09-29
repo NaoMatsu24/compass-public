@@ -75,7 +75,7 @@ async function chooseSyncData(cloud){
   if(!syncCanApply(gen,uid,local))throw Error('操作中に端末の記録が変わりました。再確認してください。');
   if(cloud){localStorage.setItem(KEY,JSON.stringify(candidate));state=candidate;}
   r.meta={enabled:true,owner:uid,base:chosen,last:new Date().toISOString()};localStorage.setItem(SYNC_KEY,JSON.stringify(r.meta));
-  r.remote=null;r.error='';r.message='同期済み';render();
+  r.remote=null;r.error='';r.message=syncLocalRaw()===r.meta.base?'同期済み':'変更を送信待ち';render();if(syncLocalRaw()!==r.meta.base)scheduleCompassSync();
  }catch(e){r.error=e.message;}
  finally{r.busy=false;refreshCompassSync();}
 }

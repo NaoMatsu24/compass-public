@@ -15,7 +15,7 @@ function farReviewSchedule(source,f,date=today()){
  const daily=new Map();
  const add=(day,outcome)=>{if(!validDate(day)||day>date)return;if(!daily.has(day))daily.set(day,[]);daily.get(day).push(outcome);};
  if(f.last)add(f.last,'study');
- for(const t of source.tasks)if(t.category==='USCPA'&&t.farStudyChapterId===f.id&&t.done&&t.actual>0)add(t.completedDate||t.date,t.planType==='far-spaced'?(t.reviewOutcome||'good'):'study');
+ for(const t of expandStudyTasks(source.tasks))if(t.category==='USCPA'&&t.farStudyChapterId===f.id&&t.done&&t.actual>0)add(t.completedDate||t.date,t.planType==='far-spaced'?(t.reviewOutcome||'good'):'study');
  let stage=0,last='',interval=1,outcome='study';
  for(const [day,results]of [...daily].sort(([a],[b])=>a.localeCompare(b))){
   outcome=results.includes('again')?'again':results.includes('hard')?'hard':results.includes('good')?'good':'study';
@@ -24,7 +24,7 @@ function farReviewSchedule(source,f,date=today()){
   interval=outcome==='hard'?1:REVIEW_INTERVALS[stage];last=day;
  }
  const next=last?addDays(last,interval):'';
- const pending=source.tasks.find(t=>!t.done&&t.category==='USCPA'&&t.farStudyChapterId===f.id);
+ const pending=expandStudyTasks(source.tasks).find(t=>!t.done&&t.category==='USCPA'&&t.farStudyChapterId===f.id);
  return {stage,last,next,interval,outcome,due:Boolean(next&&next<=date),pending};
 }
 function dueFarReviews(source,date=today()){
@@ -40,7 +40,7 @@ function farTasksWithReviews(source,date,type,make){
  return [...reviews,...workloadFarTasks(source,date,type,make,300-reviews.length*15,reviews.map(t=>t.farStudyChapterId))];
 }
 function spacedOutcomeField(task){
- if(task?.planType!=='far-spaced')return '';
+ if(task?.planType!=='far-spaced'&&!task?.studyParts?.some(p=>p.planType==='far-spaced'))return '';
  return `<div class="review-outcome">${field('reviewOutcome','復習で思い出せた程度','',task.reviewOutcome||'good',Object.entries(REVIEW_OUTCOMES))}<p class="muted">覚えていた：次の間隔へ。少し曖昧：翌日に再確認。忘れていた：1日後からやり直します。実績0分では復習日を進めません。</p></div>`;
 }
 function spacedReviewSummary(){
